@@ -1,76 +1,356 @@
-#####################################################################
-# CSCB58 Summer 2024 Assembly Final Project - UTSC
-# Student1: Name, Student Number, UTorID, official email
-# Student2: Name, Student Number, UTorID, official email
-#
-# Bitmap Display Configuration:
-# - Unit width in pixels: 4 (update this as needed) 
-# - Unit height in pixels: 4 (update this as needed)
-# - Display width in pixels: 256 (update this as needed)
-# - Display height in pixels: 256 (update this as needed)
-# - Base Address for Display: 0x10008000 ($gp)
-#
-# Which milestones have been reached in this submission?
-# (See the assignment handout for descriptions of the milestones)
-# - Milestone 1/2/3/4/5 (choose the one the applies)
-#
-# Which approved features have been implemented?
-# (See the assignment handout for the list of features)
-# Easy Features:
-# 1. (fill in the feature, if any)
-# 2. (fill in the feature, if any)
-# ... (add more if necessary)
-# Hard Features:
-# 1. (fill in the feature, if any)
-# 2. (fill in the feature, if any)
-# ... (add more if necessary)
-# How to play:
-# (Include any instructions)
-# Link to video demonstration for final submission:
-# - (insert YouTube / MyMedia / other URL here). Make sure we can view it!
-#
-# Are you OK with us sharing the video with people outside course staff?
-# - yes / no
-#
-# Any additional information that the TA needs to know:
-# - (write here, if any)
-#
-#####################################################################
+.data
+ADDR_DSPL: .word 0x10008000  # Base address for display
+ADDR_KBRD: .word 0xffff0000  # Base address for keyboard
+COLOR_GRAY: .word 0x00808080  # Wall color
+COLOR_TETROMINO: .word 0x00FF00FF  # Tetromino color
+COLOR_BLACK: .word 0x00000000  # Black color for clearing
+I_TETROMINO: .word 0x0000000F, 0x00000000, 0x00000000, 0x00000000  # Tetromino shape
+current_tetromino: .word 0x0000000F, 0x00000000, 0x00000000, 0x00000000  # Current tetromino
+current_x: .word 1  # X position
+current_y: .word 1  # Y position
+is_vertical: .word 1  # Orientation
+playing_field: .space 4096  # Playing field
 
-##############################################################################
+.text
+.globl main
 
-    .data
-##############################################################################
-# Immutable Data
-##############################################################################
-# The address of the bitmap display. Don't forget to connect it!
-ADDR_DSPL:
-    .word 0x10008000
-# The address of the keyboard. Don't forget to connect it!
-ADDR_KBRD:
-    .word 0xffff0000
-
-##############################################################################
-# Mutable Data
-##############################################################################
-
-##############################################################################
-# Code
-##############################################################################
-	.text
-	.globl main
-
-	# Run the Tetris game.
 main:
-    # Initialize the game
+    la $t0, ADDR_DSPL
+    lw $t0, 0($t0)
+    la $t3, COLOR_GRAY
+    lw $t3, 0($t3)
+
+    # Draw the top border
+    li $t2, 0
+top_border:
+    beq $t2, 32, top_done 
+    sw $t3, 0($t0)
+    addi $t0, $t0, 4  # Move to the next unit in the row
+    addi $t2, $t2, 1
+    j top_border
+top_done:
+
+    # Draw the bottom border
+    li $t2, 0
+    li $t0, 0x10008F80  # Start address at last row (bottom border) *(maybe there is a better way) [Base address + (31 rows * 32 boxes per row * 4 bytes per box)]
+bottom_border:
+    beq $t2, 32, bottom_done 
+    sw $t3, 0($t0)
+    addi $t0, $t0, 4  # Move to the next unit in the row
+    addi $t2, $t2, 1
+    j bottom_border
+bottom_done:
+
+    # Draw the left border
+    li $t2, 0
+    li $t0, 0x10008000  # Start at first column (left border) [Base address]
+left_border:
+    beq $t2, 32, left_done
+    sw $t3, 0($t0)
+    addi $t0, $t0, 128  # Move to the next row (32 boxes per row * 4 bytes per box)
+    addi $t2, $t2, 1
+    j left_border
+left_done:
+
+    # Draw the right border
+    li $t2, 0
+    li $t0, 0x1000807C  # Start at last column (right border) [Base address + (31 * 4 bytes)]
+right_border:
+    beq $t2, 32, right_done 
+    sw $t3, 0($t0)
+    addi $t0, $t0, 128  # Move to the next row
+    addi $t2, $t2, 1
+    j right_border
+right_done:
+
+    jal draw_tetromino  # Draw fist tetromino
 
 game_loop:
-	# 1a. Check if key has been pressed
-    # 1b. Check which key has been pressed
-    # 2a. Check for collisions
-	# 2b. Update locations (paddle, ball)
-	# 3. Draw the screen
-	# 4. Sleep
+    li $t1, 0xffff0000
+    lw $t2, 0($t1)
+    beq $t2, $zero, game_loop  # Check for key press
 
-    #5. Go back to 1
-    b game_loop
+    lw $t3, 4($t1)
+    beq $t3, 0x61, move_left     # 'a' key
+    beq $t3, 0x64, move_right    # 'd' key
+    beq $t3, 0x73, move_down     # 's' key
+    beq $t3, 0x77, rotate        # 'w' key
+
+    j game_loop
+
+move_left:  # Move tetromino left
+    jal clear_tetromino
+    jal can_move_left
+    beq $v0, $zero, end_move_left
+    lw $t0, current_x
+    addi $t0, $t0, -1
+    sw $t0, current_x
+end_move_left:
+    jal draw_tetromino
+    j game_loop
+
+move_right:  # Move tetromino right
+    jal clear_tetromino
+    jal can_move_right
+    beq $v0, $zero, end_move_right
+    lw $t0, current_x
+    addi $t0, $t0, 1
+    sw $t0, current_x
+end_move_right:
+    jal draw_tetromino
+    j game_loop
+
+move_down:  # Move tetromino down
+    jal clear_tetromino
+    jal can_move_down
+    beq $v0, $zero, end_move_down
+    lw $t0, current_y
+    addi $t0, $t0, 1
+    sw $t0, current_y
+end_move_down:
+    jal draw_tetromino
+    j game_loop
+
+rotate:  # Rotate tetromino
+    jal clear_tetromino
+    lw $t0, is_vertical
+    xori $t0, $t0, 1
+    sw $t0, is_vertical
+    jal draw_tetromino
+    j game_loop
+
+draw_tetromino:  # Draw tetromino on screen
+    la $t0, ADDR_DSPL
+    lw $t0, 0($t0)
+    la $t1, COLOR_TETROMINO
+    lw $t1, 0($t1)
+    lw $t3, current_x
+    lw $t4, current_y
+    lw $t5, is_vertical
+    li $t6, 0x0000000F
+
+    beq $t5, $zero, draw_horizontal
+draw_vertical:
+    andi $t7, $t6, 0x1
+    beqz $t7, skip_block1
+    mul $t8, $t4, 128
+    mul $t9, $t3, 4
+    add $t8, $t0, $t8
+    add $t8, $t8, $t9
+    sw $t1, 0($t8)
+skip_block1:
+    addi $t4, $t4, 1
+    srl $t6, $t6, 1
+    bnez $t6, draw_vertical
+    jr $ra
+
+draw_horizontal:
+    li $t6, 0x0000000F
+draw_horizontal_loop:
+    andi $t7, $t6, 0x1
+    beqz $t7, skip_block2
+    mul $t8, $t4, 128
+    mul $t9, $t3, 4
+    add $t8, $t0, $t8
+    add $t8, $t8, $t9
+    sw $t1, 0($t8)
+skip_block2:
+    addi $t3, $t3, 1
+    srl $t6, $t6, 1
+    bnez $t6, draw_horizontal_loop
+    jr $ra
+
+clear_tetromino:  # Clear tetromino from screen
+    la $t0, ADDR_DSPL
+    lw $t0, 0($t0)
+    la $t1, COLOR_BLACK
+    lw $t1, 0($t1)
+    lw $t3, current_x
+    lw $t4, current_y
+    lw $t5, is_vertical
+    li $t6, 0x0000000F
+
+    beq $t5, $zero, clear_horizontal
+clear_vertical:
+    andi $t7, $t6, 0x1
+    beqz $t7, skip_clear_block1
+    mul $t8, $t4, 128
+    mul $t9, $t3, 4
+    add $t8, $t0, $t8
+    add $t8, $t8, $t9
+    sw $t1, 0($t8)
+skip_clear_block1:
+    addi $t4, $t4, 1
+    srl $t6, $t6, 1
+    bnez $t6, clear_vertical
+    jr $ra
+
+clear_horizontal:
+    li $t6, 0x0000000F
+clear_horizontal_loop:
+    andi $t7, $t6, 0x1
+    beqz $t7, skip_clear_block2
+    mul $t8, $t4, 128
+    mul $t9, $t3, 4
+    add $t8, $t0, $t8
+    add $t8, $t8, $t9
+    sw $t1, 0($t8)
+skip_clear_block2:
+    addi $t3, $t3, 1
+    srl $t6, $t6, 1
+    bnez $t6, clear_horizontal_loop
+    jr $ra
+
+can_move_left:  # Check if tetromino can move left
+    la $t0, current_tetromino
+    lw $t1, current_x
+    lw $t2, current_y
+    lw $t3, is_vertical
+    li $t4, 0x0000000F
+    beq $t3, $zero, check_horizontal_left
+check_vertical_left:
+    andi $t5, $t4, 0x1
+    beqz $t5, skip_check_left1
+    sub $t6, $t1, 1
+    blt $t6, 1, cannot_move_left   # Left wall limit
+    mul $t7, $t2, 128
+    mul $t8, $t6, 4
+    add $t7, $t7, $t8
+    la $t9, playing_field
+    add $t7, $t7, $t9
+    lw $t8, 0($t7)
+    bne $t8, $zero, cannot_move_left
+skip_check_left1:
+    addi $t2, $t2, 1
+    srl $t4, $t4, 1
+    bnez $t4, check_vertical_left
+    li $v0, 1
+    jr $ra
+
+check_horizontal_left:
+    li $t4, 0x0000000F
+check_horizontal_left_loop:
+    andi $t5, $t4, 0x1
+    beqz $t5, skip_check_left2
+    sub $t6, $t1, 1
+    blt $t6, 1, cannot_move_left   # Left wall limit
+    mul $t7, $t2, 128
+    mul $t8, $t6, 4
+    add $t7, $t7, $t8
+    la $t9, playing_field
+    add $t7, $t7, $t9
+    lw $t8, 0($t7)
+    bne $t8, $zero, cannot_move_left
+skip_check_left2:
+    addi $t1, $t1, 1
+    srl $t4, $t4, 1
+    bnez $t4, check_horizontal_left_loop
+    li $v0, 1
+    jr $ra
+
+cannot_move_left:
+    li $v0, 0
+    jr $ra
+
+can_move_right:  # Check if tetromino can move right
+    la $t0, current_tetromino
+    lw $t1, current_x
+    lw $t2, current_y
+    lw $t3, is_vertical
+    li $t4, 0x0000000F
+    beq $t3, $zero, check_horizontal_right
+check_vertical_right:
+    andi $t5, $t4, 0x1
+    beqz $t5, skip_check_right1
+    add $t6, $t1, 1
+    bge $t6, 31, cannot_move_right  # Right wall limit
+    mul $t7, $t2, 128
+    mul $t8, $t6, 4
+    add $t7, $t7, $t8
+    la $t9, playing_field
+    add $t7, $t7, $t9
+    lw $t8, 0($t7)
+    bne $t8, $zero, cannot_move_right
+skip_check_right1:
+    addi $t2, $t2, 1
+    srl $t4, $t4, 1
+    bnez $t4, check_vertical_right
+    li $v0, 1
+    jr $ra
+
+check_horizontal_right:
+    li $t4, 0x0000000F
+check_horizontal_right_loop:
+    andi $t5, $t4, 0x1
+    beqz $t5, skip_check_right2
+    add $t6, $t1, 1
+    bge $t6, 31, cannot_move_right  # Right wall limit
+    mul $t7, $t2, 128
+    mul $t8, $t6, 4
+    add $t7, $t7, $t8
+    la $t9, playing_field
+    add $t7, $t7, $t9
+    lw $t8, 0($t7)
+    bne $t8, $zero, cannot_move_right
+skip_check_right2:
+    addi $t1, $t1, 1
+    srl $t4, $t4, 1
+    bnez $t4, check_horizontal_right_loop
+    li $v0, 1
+    jr $ra
+
+cannot_move_right:
+    li $v0, 0
+    jr $ra
+
+can_move_down:  # Check if tetromino can move down
+    la $t0, current_tetromino
+    lw $t1, current_x
+    lw $t2, current_y
+    lw $t3, is_vertical
+    li $t4, 0x0000000F
+    beq $t3, $zero, check_horizontal_down
+check_vertical_down:
+    andi $t5, $t4, 0x1
+    beqz $t5, skip_check_down1
+    add $t6, $t2, 1
+    bge $t6, 31, cannot_move_down  # Bottom limit
+    mul $t7, $t6, 128
+    mul $t8, $t1, 4
+    add $t7, $t7, $t8
+    la $t9, playing_field
+    add $t7, $t7, $t9
+    lw $t8, 0($t7)
+    bne $t8, $zero, cannot_move_down
+skip_check_down1:
+    addi $t2, $t2, 1
+    srl $t4, $t4, 1
+    bnez $t4, check_vertical_down
+    li $v0, 1
+    jr $ra
+
+check_horizontal_down:
+    li $t4, 0x0000000F
+check_horizontal_down_loop:
+    andi $t5, $t4, 0x1
+    beqz $t5, skip_check_down2
+    add $t6, $t2, 1
+    bge $t6, 31, cannot_move_down  # Bottom limit
+    mul $t7, $t6, 128
+    mul $t8, $t1, 4
+    add $t7, $t7, $t8
+    la $t9, playing_field
+    add $t7, $t7, $t9
+    lw $t8, 0($t7)
+    bne $t8, $zero, cannot_move_down
+skip_check_down2:
+    addi $t1, $t1, 1
+    srl $t4, $t4, 1
+    bnez $t4, check_horizontal_down_loop
+    li $v0, 1
+    jr $ra
+
+cannot_move_down:
+    li $v0, 0
+    jr $ra
+
