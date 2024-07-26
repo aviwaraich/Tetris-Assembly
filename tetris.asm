@@ -39,7 +39,7 @@ main:
     lw $t0, 0($t0)
     la $t3, COLOR_GRAY
     lw $t3, 0($t3)
-
+    jal clear_screen
     # Draw the top border
     li $t2, 0
 top_border:
@@ -102,40 +102,113 @@ game_loop:
 move_left:  # Move tetromino left
     jal clear_shape
     jal can_move_left
-    beq $v0, $zero, end_move_left
+    beq $v0, $zero, end_move
     lw $t0, current_x
     addi $t0, $t0, -1
     sw $t0, current_x
-end_move_left:
-    jal draw_shape
-    j game_loop
+    j end_move
 
 move_right:  # Move tetromino right
     jal clear_shape
     jal can_move_right
-    beq $v0, $zero, end_move_right
+    beq $v0, $zero, end_move
     lw $t0, current_x
     addi $t0, $t0, 1
     sw $t0, current_x
-end_move_right:
-    jal draw_shape
-    j game_loop
+    j end_move
 
-move_down:  # Move tetromino down
+move_down:
     jal clear_shape
     jal can_move_down
-    beq $v0, $zero, end_move_down
+    beq $v0, $zero, tetromino_landed
     lw $t0, current_y
     addi $t0, $t0, 1
     sw $t0, current_y
-end_move_down:
+    j end_move
+
+#clear the screen
+clear_screen:
+    la $t0, ADDR_DSPL
+    lw $t0, 0($t0)
+    li $t1, 0x00000000  # Black color
+    li $t2, 1024  # 32x32 display
+clear_loop:
+    sw $t1, 0($t0)
+    addi $t0, $t0, 4
+    addi $t2, $t2, -1
+    bnez $t2, clear_loop
+    jr $ra
+
+
+generate_new_tetromino:
+    li $t0, 14  # Reset X position to center
+    sw $t0, current_x
+    li $t0, 1   # Reset Y position to top
+    sw $t0, current_y
+    li $t0, 1   # Reset rotation
+    sw $zero, rotation
+    jr $ra
+
+tetromino_landed:
+    jal add_to_playing_field
+    jal redraw_playing_field
+    jal generate_new_tetromino
+
+end_move:
     jal draw_shape
     j game_loop
+
+add_to_playing_field:
+    	li $t0 0
+	la $t8 COLOR_TETROMINO
+	lw $t8 0($t8)
+	li $t6 32
+	add_loop_start:
+	bge $t0 $t6 add_loop_end
+	add_loop: 
+	#LOAD x and y values
+	lw $t1 current_shape($t0)
+	addi $t5 $t0 4
+	lw $t2 current_shape($t5)
+	lw $t5 rotation($zero)
+		#for each rotation, rotate it once
+		add_rotate_loop_start:
+			beqz $t5 add_rotate_loop_end
+		add_rotate_loop: 
+			sub $t3 $zero $t2
+			add $t4 $zero $t1
+			addi $t5 $t5 -1
+			move $t1 $t3
+			move $t2 $t4
+			j add_rotate_loop_start
+		add_rotate_loop_end:
+		#By this point, our segment is rotated in place, now we will draw
+	lw $t3 current_x
+	lw $t4 current_y
+	#multiply by 4 and 7 respectively, to match addresses
+	sll $t1 $t1 2
+	sll $t2 $t2 7
+	#do same for cx and cy
+	sll $t3 $t3 2
+	sll $t4 $t4 7
+	#sum it together
+	add $t1 $t1 $t2
+	add $t3 $t3 $t4
+	add $t1 $t1 $t3
+	#add to playing field
+	sw $t8 playing_field($t1)
+	#increase counter
+	addi $t0 $t0 8
+	j add_loop_start
+	add_loop_end:
+	#retrun
+	#TODO: replace with stack lol
+	jr $ra
 
 rotate:  # Rotate tetromino
     jal clear_shape
     jal can_rotate
-    beq $v0, $zero, end_rotate  # Do not rotate if can_rotate returns zero
+    beq $v0, $zero, end_move  # Do not rotate if can_rotate returns zero
     lw $t0, rotation
     addi $t0, $t0, 1
     li $t1 3
@@ -144,9 +217,7 @@ rotate:  # Rotate tetromino
     subi $t0 $t0 4
     pass_rotation: 
     sw $t0, rotation
-end_rotate:
-    jal draw_shape
-    j game_loop
+    j end_move
 
 
 #NEW DRAW FUNCTION: This will draw the current shape regardless of type
@@ -249,89 +320,6 @@ clear_shape:
 	#retrun
 	#TODO: replace with stack lol
 	jr $ra
-
-
-draw_tetromino:  # Draw tetromino on screen
-    la $t0, ADDR_DSPL
-    lw $t0, 0($t0)
-    la $t1, COLOR_TETROMINO
-    lw $t1, 0($t1)
-    lw $t3, current_x
-    lw $t4, current_y
-    lw $t5, is_vertical
-    li $t6, 0x0000000F
-
-    beq $t5, $zero, draw_horizontal
-draw_vertical:
-    andi $t7, $t6, 0x1
-    beqz $t7, skip_block1
-    mul $t8, $t4, 128
-    mul $t9, $t3, 4
-    add $t8, $t0, $t8
-    add $t8, $t8, $t9
-    sw $t1, 0($t8)
-skip_block1:
-    addi $t4, $t4, 1
-    srl $t6, $t6, 1
-    bnez $t6, draw_vertical
-    jr $ra
-
-draw_horizontal:
-    li $t6, 0x0000000F
-draw_horizontal_loop:
-    andi $t7, $t6, 0x1
-    beqz $t7, skip_block2
-    mul $t8, $t4, 128
-    mul $t9, $t3, 4
-    add $t8, $t0, $t8
-    add $t8, $t8, $t9
-    sw $t1, 0($t8)
-skip_block2:
-    addi $t3, $t3, 1
-    srl $t6, $t6, 1
-    bnez $t6, draw_horizontal_loop
-    jr $ra
-
-clear_tetromino:  # Clear tetromino from screen
-    la $t0, ADDR_DSPL
-    lw $t0, 0($t0)
-    la $t1, COLOR_BLACK
-    lw $t1, 0($t1)
-    lw $t3, current_x
-    lw $t4, current_y
-    lw $t5, is_vertical
-    li $t6, 0x0000000F
-
-    beq $t5, $zero, clear_horizontal
-clear_vertical:
-    andi $t7, $t6, 0x1
-    beqz $t7, skip_clear_block1
-    mul $t8, $t4, 128
-    mul $t9, $t3, 4
-    add $t8, $t0, $t8
-    add $t8, $t8, $t9
-    sw $t1, 0($t8)
-skip_clear_block1:
-    addi $t4, $t4, 1
-    srl $t6, $t6, 1
-    bnez $t6, clear_vertical
-    jr $ra
-
-clear_horizontal:
-    li $t6, 0x0000000F
-clear_horizontal_loop:
-    andi $t7, $t6, 0x1
-    beqz $t7, skip_clear_block2
-    mul $t8, $t4, 128
-    mul $t9, $t3, 4
-    add $t8, $t0, $t8
-    add $t8, $t8, $t9
-    sw $t1, 0($t8)
-skip_clear_block2:
-    addi $t3, $t3, 1
-    srl $t6, $t6, 1
-    bnez $t6, clear_horizontal_loop
-    jr $ra
 
 can_move_left:  # Check if tetromino can move left
     la $t0, current_tetromino
@@ -553,6 +541,27 @@ rotate_horizontal_to_vertical:
 end_perform_rotation:
     sw $t0, current_x
     sw $t1, current_y
+    jr $ra
+
+#redraw the field
+redraw_playing_field:
+    la $t0, playing_field
+    la $t1, ADDR_DSPL
+    lw $t1, 0($t1)
+    li $t2, 0  # row counter
+redraw_field_loop_row:
+    li $t3, 0  # column counter
+redraw_field_loop_col:
+    lw $t4, 0($t0)
+    beqz $t4, skip_redraw_block
+    sw $t4, 0($t1)
+skip_redraw_block:
+    addi $t0, $t0, 4
+    addi $t1, $t1, 4
+    addi $t3, $t3, 1
+    blt $t3, 32, redraw_field_loop_col
+    addi $t2, $t2, 1
+    blt $t2, 32, redraw_field_loop_row
     jr $ra
 
 
