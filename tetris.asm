@@ -11,26 +11,6 @@ current_y: .word 1  # Y position
 is_vertical: .word 1  # Orientation
 playing_field: .space 4096  # Playing field
 
-#I_SHAPE: .word -32, 0, 32, 64
-#O_SHAPE: .word 0, 1, 32, 33
-#L_SHAPE: .word -32, 0, 32, 33
-#J_SHAPE: .word -32, 0, 31, 32
-#T_SHAPE: .word -32, -1, 0, 1
-#Z_SHAPE: .word -33, -32, 0, 1
-#S_SHAPE: .word -32, -31, -1, 0
-
-
-I_SHAPE: .word 0 , -1,		0 , 0,		0 , 1,		0 , 2
-O_SHAPE: .word 0 , 0 ,		0 , 1,		1 , 0,		1 , 1
-L_SHAPE: .word 0 , -1,		0 , 0,		0 , 1,		1 , 1
-J_SHAPE: .word 0 , -1,		0 , 0,		-1, 1,		0 , 1
-T_SHAPE: .word 0 , -1, 		-1, 0,		0 , 0,		0 , 1
-Z_SHAPE: .word -1, -1, 		0 ,-1,		0 , 0,		1 , 0
-S_SHAPE: .word -1, -1,		0 ,-1,		0 , 0,		1 , 0
-
-current_shape: .word 0 , -1,		0 , 0,		0 , 1,		0 , 2
-rotation: .word 0
-
 .text
 .globl main
 
@@ -83,7 +63,7 @@ right_border:
     j right_border
 right_done:
 
-    jal draw_shape  # Draw initial tetromino
+    jal draw_tetromino  # Draw initial tetromino
 
 game_loop:
     li $t1, 0xffff0000
@@ -100,156 +80,46 @@ game_loop:
     j game_loop
 
 move_left:  # Move tetromino left
-    jal clear_shape
+    jal clear_tetromino
     jal can_move_left
     beq $v0, $zero, end_move_left
     lw $t0, current_x
     addi $t0, $t0, -1
     sw $t0, current_x
 end_move_left:
-    jal draw_shape
+    jal draw_tetromino
     j game_loop
 
 move_right:  # Move tetromino right
-    jal clear_shape
+    jal clear_tetromino
     jal can_move_right
     beq $v0, $zero, end_move_right
     lw $t0, current_x
     addi $t0, $t0, 1
     sw $t0, current_x
 end_move_right:
-    jal draw_shape
+    jal draw_tetromino
     j game_loop
 
 move_down:  # Move tetromino down
-    jal clear_shape
+    jal clear_tetromino
     jal can_move_down
     beq $v0, $zero, end_move_down
     lw $t0, current_y
     addi $t0, $t0, 1
     sw $t0, current_y
 end_move_down:
-    jal draw_shape
+    jal draw_tetromino
     j game_loop
 
 rotate:  # Rotate tetromino
-    jal clear_shape
+    jal clear_tetromino
     jal can_rotate
     beq $v0, $zero, end_rotate  # Do not rotate if can_rotate returns zero
-    lw $t0, rotation
-    addi $t0, $t0, 1
-    li $t1 3
-    ble $t0 $t1 pass_rotation
-    #If rotation too large, subtract
-    subi $t0 $t0 4
-    pass_rotation: 
-    sw $t0, rotation
+    jal perform_rotation
 end_rotate:
-    jal draw_shape
+    jal draw_tetromino
     j game_loop
-
-
-#NEW DRAW FUNCTION: This will draw the current shape regardless of type
-draw_shape: 
-	li $t0 0
-	#load display
-	la $t8 COLOR_TETROMINO
-	lw $t8 0($t8)
-	li $t6 32
-	draw_loop_start:
-	bge $t0 $t6 draw_loop_end
-	draw_loop: 
-	#LOAD x and y values
-	lw $t1 current_shape($t0)
-	addi $t5 $t0 4
-	lw $t2 current_shape($t5)
-	lw $t5 rotation($zero)
-		#for each rotation, rotate it once
-		rotate_loop_start:
-			beqz $t5 rotate_loop_end
-		rotate_loop: 
-			sub $t3 $zero $t2
-			add $t4 $zero $t1
-			addi $t5 $t5 -1
-			move $t1 $t3
-			move $t2 $t4
-			j rotate_loop_start
-		rotate_loop_end:
-		#By this point, our segment is rotated in place, now we will draw
-	lw $t3 current_x
-	lw $t4 current_y
-	#multiply by 4 and 7 respectively, to match addresses
-	sll $t1 $t1 2
-	sll $t2 $t2 7
-	#do same for cx and cy
-	sll $t3 $t3 2
-	sll $t4 $t4 7
-	#sum it together
-	add $t1 $t1 $t2
-	add $t3 $t3 $t4
-	add $t1 $t1 $t3
-	#display pixel
-	la $t9 ADDR_DSPL
-	lw $t9 0($t9)
-	add $t1 $t1 $t9
-	sw $t8 0($t1)
-	#increase counter
-	addi $t0 $t0 8
-	j draw_loop_start
-	draw_loop_end:
-	#retrun
-	#TODO: replace with stack lol
-	jr $ra
-
-clear_shape: 
-	li $t0 0
-	#load display
-	li $t6 32
-	draw_loop_start2:
-	bge $t0 $t6 draw_loop_end2
-	draw_loop2: 
-	#LOAD x and y values
-	lw $t1 current_shape($t0)
-	addi $t5 $t0 4
-	lw $t2 current_shape($t5)
-	lw $t5 rotation($zero)
-		#for each rotation, rotate it once
-		rotate_loop_start2:
-			beqz $t5 rotate_loop_end2
-		rotate_loop2: 
-			sub $t3 $zero $t2
-			add $t4 $zero $t1
-			addi $t5 $t5 -1
-			move $t1 $t3
-			move $t2 $t4
-			j rotate_loop_start2
-		rotate_loop_end2:
-		#By this point, our segment is rotated in place, now we will draw
-	lw $t3 current_x
-	lw $t4 current_y
-	#multiply by 4 and 7 respectively, to match addresses
-	sll $t1 $t1 2
-	sll $t2 $t2 7
-	#do same for cx and cy
-	sll $t3 $t3 2
-	sll $t4 $t4 7
-	#sum it together
-	add $t1 $t1 $t2
-	add $t3 $t3 $t4
-	add $t1 $t1 $t3
-	#display pixel
-	la $t9 ADDR_DSPL
-	lw $t9 0($t9)
-	add $t1 $t1 $t9
-	sw $zero 0($t1)
-	#increase counter
-	addi $t0 $t0 8
-	j draw_loop_start2
-	draw_loop_end2:
-	#retrun
-	#TODO: replace with stack lol
-	jr $ra
-
 
 draw_tetromino:  # Draw tetromino on screen
     la $t0, ADDR_DSPL
