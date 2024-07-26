@@ -75,7 +75,8 @@ game_loop:
     beq $t3, 0x64, move_right    # 'd' key
     beq $t3, 0x73, move_down     # 's' key
     beq $t3, 0x77, rotate        # 'w' key
-
+    beq $t3, 0x71, quit        # 'q' key
+	
     j game_loop
 
 move_left:  # Move tetromino left
@@ -423,3 +424,8 @@ end_perform_rotation:
     sw $t0, current_x
     sw $t1, current_y
     jr $ra
+
+
+quit: 
+    li $v0 10
+    syscall
