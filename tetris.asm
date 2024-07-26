@@ -6,7 +6,7 @@ COLOR_TETROMINO: .word 0x00FF00FF  # Tetromino color
 COLOR_BLACK: .word 0x00000000  # Black color for clearing
 I_TETROMINO: .word 0x0000000F, 0x00000000, 0x00000000, 0x00000000  # Tetromino shape
 current_tetromino: .word 0x0000000F, 0x00000000, 0x00000000, 0x00000000  # Current tetromino
-current_x: .word 1  # X position
+current_x: .word 14  # Centered X position (32/2 - 2) = 14 
 current_y: .word 1  # Y position
 is_vertical: .word 1  # Orientation
 playing_field: .space 4096  # Playing field
@@ -32,7 +32,7 @@ top_done:
 
     # Draw the bottom border
     li $t2, 0
-    li $t0, 0x10008F80  # Start address at last row (bottom border) *(maybe there is a better way) [Base address + (31 rows * 32 boxes per row * 4 bytes per box)]
+    li $t0, 0x10008F80  # Start address at last row (bottom border) [Base address + (31 rows * 32 units per row * 4 bytes per unit)]
 bottom_border:
     beq $t2, 32, bottom_done 
     sw $t3, 0($t0)
@@ -47,7 +47,7 @@ bottom_done:
 left_border:
     beq $t2, 32, left_done
     sw $t3, 0($t0)
-    addi $t0, $t0, 128  # Move to the next row (32 boxes per row * 4 bytes per box)
+    addi $t0, $t0, 128  # Move to the next row (32 units per row * 4 bytes per unit)
     addi $t2, $t2, 1
     j left_border
 left_done:
@@ -63,7 +63,7 @@ right_border:
     j right_border
 right_done:
 
-    jal draw_tetromino  # Draw fist tetromino
+    jal draw_tetromino  # Draw initial tetromino
 
 game_loop:
     li $t1, 0xffff0000
@@ -113,9 +113,10 @@ end_move_down:
 
 rotate:  # Rotate tetromino
     jal clear_tetromino
-    lw $t0, is_vertical
-    xori $t0, $t0, 1
-    sw $t0, is_vertical
+    jal can_rotate
+    beq $v0, $zero, end_rotate  # Do not rotate if can_rotate returns zero
+    jal perform_rotation
+end_rotate:
     jal draw_tetromino
     j game_loop
 
@@ -263,7 +264,7 @@ check_vertical_right:
     andi $t5, $t4, 0x1
     beqz $t5, skip_check_right1
     add $t6, $t1, 1
-    bge $t6, 31, cannot_move_right  # Right wall limit
+    bge $t6, 32, cannot_move_right  # Right wall limit
     mul $t7, $t2, 128
     mul $t8, $t6, 4
     add $t7, $t7, $t8
@@ -354,3 +355,71 @@ cannot_move_down:
     li $v0, 0
     jr $ra
 
+can_rotate:  # Check if tetromino can rotate without collision
+    la $t0, ADDR_DSPL
+    lw $t0, 0($t0)
+    la $t1, COLOR_GRAY
+    lw $t1, 0($t1)
+    lw $t3, current_x
+    lw $t4, current_y
+    lw $t5, is_vertical
+    xori $t5, $t5, 1  # Toggle (o or 1) to check the rotated state
+    li $t6, 0x0000000F
+
+    beq $t5, $zero, check_horizontal_rotate
+check_vertical_rotate:
+    andi $t7, $t6, 0x1
+    beqz $t7, skip_check_rotate1
+    mul $t8, $t4, 128
+    mul $t9, $t3, 4
+    add $t8, $t0, $t8
+    add $t8, $t8, $t9
+    lw $t2, 0($t8)
+    beq $t2, $t1, cannot_rotate  # Collision with gray (wall)
+skip_check_rotate1:
+    addi $t4, $t4, 1
+    srl $t6, $t6, 1
+    bnez $t6, check_vertical_rotate
+    li $v0, 1
+    jr $ra
+
+check_horizontal_rotate:
+    li $t6, 0x0000000F
+check_horizontal_rotate_loop:
+    andi $t7, $t6, 0x1
+    beqz $t7, skip_check_rotate2
+    mul $t8, $t4, 128
+    mul $t9, $t3, 4
+    add $t8, $t0, $t8
+    add $t8, $t8, $t9
+    lw $t2, 0($t8)
+    beq $t2, $t1, cannot_rotate  # Collision with gray (wall)
+skip_check_rotate2:
+    addi $t3, $t3, 1
+    srl $t6, $t6, 1
+    bnez $t6, check_horizontal_rotate_loop
+    li $v0, 1
+    jr $ra
+
+cannot_rotate:
+    li $v0, 0
+    jr $ra
+
+perform_rotation:  # Do 180-degree rotation
+    lw $t0, current_x
+    lw $t1, current_y
+    lw $t2, is_vertical
+    xori $t2, $t2, 1
+    sw $t2, is_vertical
+    beq $t2, $zero, rotate_horizontal_to_vertical
+rotate_vertical_to_horizontal:
+    addi $t0, $t0, 1
+    addi $t1, $t1, -2
+    j end_perform_rotation
+rotate_horizontal_to_vertical:
+    addi $t0, $t0, -1
+    addi $t1, $t1, 2
+end_perform_rotation:
+    sw $t0, current_x
+    sw $t1, current_y
+    jr $ra
