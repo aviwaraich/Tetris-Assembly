@@ -1,7 +1,7 @@
 # Tetris-Assembly
 
 ## 1. Milestone 1: Draw the scene (static; nothing moves yet):
-  - a) Draw the three walls of the playing area. **[Done]
+  - a) Draw the three walls of the playing area. ** [Done] **
   - b) Within the playing area, draw a grid background that shows where the blocks of each tetromino will be aligned (e.g., similar to the checkerboard grid in Figure 5.1). [Done]
   - c) Draw the first tetromino (at some initial location). [Done]
 ## 2. Milestone 2: Implement movement and other controls
