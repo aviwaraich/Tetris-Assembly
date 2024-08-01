@@ -426,6 +426,7 @@ block_landed:
 	jal redraw_playing_field
 	jal generate_new_block
 	jal draw_shape
+	jal check_full_rows
 	j game_loop
 
 
@@ -515,41 +516,6 @@ redraw_playing_field:
 	redraw_loop_end:
 	jr $ra
 	
-
-#redraw the field
-redraw_playing_field_old:
-	la $t0, playing_field
-	la $t1, ADDR_DSPL
-	lw $t1, 0($t1)
-	li $t2, 0  # row counter
-redraw_field_loop_row:
-	li $t3, 0  # column counter
-redraw_field_loop_col:
-	lw $t4, 0($t0)
-	beqz $t4, skip_redraw_block
-	sw $t4, 0($t1)
-skip_redraw_block:
-	addi $t0, $t0, 4
-	addi $t1, $t1, 4
-	
-	sw $t4, 0($t1)
-	
-	
-	
-skip_redraw_block:
-	addi $t0, $t0, 4
-	addi $t1, $t1, 4
-	
-	add $t5 $t4 $t3
-	andi $t5 $t5 1
-	
-	
-	addi $t3, $t3, 1
-	blt $t3, 32, redraw_field_loop_col
-	addi $t2, $t2, 1
-	blt $t2, 32, redraw_field_loop_row
-	jr $ra
-
 #####################################################################
 
 check_full_rows:
