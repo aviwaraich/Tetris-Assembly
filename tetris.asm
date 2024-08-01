@@ -1,9 +1,46 @@
+######################################################################
+# CSCB58 Summer 2024 Assembly Final Project - UTSC
+# Student1: Jack Liu (Jia Qing Liu), 1009937730, liuji563, jql.liu@mail.utoronto.ca
+# Student2: Aviraj Waraich, 1006152057, waraic11, a.waraich@mail.utoronto.ca
+#
+# Bitmap Display Configuration:
+# - Unit width in pixels: 8
+# - Unit height in pixels: 8
+# - Display width in pixels: 256
+# - Display height in pixels: 256
+# - Base Address for Display: 0x10008000 ($gp)
+#
+# Which milestones have been reached in this submission?
+# - Milestone 3
+#
+# Which approved features have been implemented?
+# None
+#
+# How to play:
+# W- Rotate
+# A- Move left
+# S- Move down (temporary)
+# D- Move right
+# Q- quit
+# 
+# Link to video demonstration for final submission:
+# Not applicable
+#
+# Are you OK with us sharing the video with people outside course staff?
+# Yes
+#
+# Any additional information that the TA needs to know:
+#
+######################################################################
+
+
 .data
 ADDR_DSPL: .word 0x10008000  # Base address for display
 ADDR_KBRD: .word 0xffff0000  # Base address for keyboard
 COLOR_GRAY: .word 0x00808080  # Wall color
 COLOR_TETROMINO: .word 0x00FF00FF  # Tetromino color
 COLOR_BLACK: .word 0x00000000  # Black color for clearing
+COLOR_DARK: .word 0x00101010  # Dark grey for checkerboard
 I_TETROMINO: .word 0x0000000F, 0x00000000, 0x00000000, 0x00000000  # Tetromino shape
 current_tetromino: .word 0x0000000F, 0x00000000, 0x00000000, 0x00000000  # Current tetromino
 current_x: .word 14  # Centered X position (32/2 - 2) = 14 
@@ -86,6 +123,7 @@ right_border:
 	j right_border
 right_done:				#Finished border
 
+jal redraw_playing_field
 jal draw_shape  			# Draw initial shape
 #-------------
 #--GAME LOOP--
@@ -337,6 +375,8 @@ draw_shape:
 	draw_loop_end: jr $ra		#return
 
 clear_shape: 
+	la $s6 COLOR_DARK
+	lw $s6 0($s6)
 	li $t0 0
 	#load display
 	li $t6 32
@@ -358,7 +398,18 @@ clear_shape:
 		la $t9 ADDR_DSPL
 		lw $t9 0($t9)
 		add $t1 $t1 $t9
+		
+		andi $t2 $t1 128
+		srl $t2 $t2 5
+		add $t2 $t1 $t2
+		andi $t2 $t2 4
+		
+		beqz $t2 clear_grey
 		sw $zero 0($t1)
+		j clear_done
+		clear_grey:
+		sw $s6 0($t1)
+		clear_done:
 		addi $t0 $t0 8		# i ++
 	j clear_shape_loop
 	clear_shape_loop_end: jr $ra		#return
@@ -411,8 +462,60 @@ add_to_playing_field:
 
 
 
-#redraw the field
 redraw_playing_field:
+	la $t0, playing_field
+	la $t1, ADDR_DSPL
+	lw $t1, 0($t1)
+	li $t2, 0 #counter
+	li $t9  4096
+	li $t8 128
+	
+	la $s7 COLOR_TETROMINO
+	lw $s7 0($s7)
+	la $s6 COLOR_DARK
+	lw $s6 0($s6)
+	
+	redraw_loop:
+	
+		
+		bgt $t2 $t9 redraw_loop_end
+		div $t2 $t8
+		mflo $t4 #y
+		mfhi $t3 #x
+		
+		beqz $t3 redraw_loop_continue
+		li $t7 124
+		beq $t3 $t7 redraw_loop_continue
+		li $t7 31
+		beq $t4 $t7 redraw_loop_continue
+		
+		lw $t7 playing_field($t2)
+		add $t6 $t2 $t1
+		beqz $t7 redraw_background
+		sw $s7 0($t6)
+		j redraw_loop_continue
+		redraw_background:	
+		
+			
+			andi $t5 $t2 128
+			srl $t5 $t5 5
+			add $t5 $t5 $t2
+			andi $t5 $t5 4
+			beqz $t5 redraw_grey
+				sw $zero 0($t6)
+				j redraw_loop_continue
+			redraw_grey:
+				sw $s6 0($t6)
+		
+	redraw_loop_continue:
+		addi $t2 $t2 4
+		j redraw_loop
+	redraw_loop_end:
+	jr $ra
+	
+
+#redraw the field
+redraw_playing_field_old:
 	la $t0, playing_field
 	la $t1, ADDR_DSPL
 	lw $t1, 0($t1)
@@ -422,10 +525,19 @@ redraw_field_loop_row:
 redraw_field_loop_col:
 	lw $t4, 0($t0)
 	beqz $t4, skip_redraw_block
+	
 	sw $t4, 0($t1)
+	
+	
+	
 skip_redraw_block:
 	addi $t0, $t0, 4
 	addi $t1, $t1, 4
+	
+	add $t5 $t4 $t3
+	andi $t5 $t5 1
+	
+	
 	addi $t3, $t3, 1
 	blt $t3, 32, redraw_field_loop_col
 	addi $t2, $t2, 1
