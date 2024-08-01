@@ -11,7 +11,7 @@
 # - Base Address for Display: 0x10008000 ($gp)
 #
 # Which milestones have been reached in this submission?
-# - Milestone 3
+# - Milestone 1, 2, 3
 #
 # Which approved features have been implemented?
 # None
