@@ -21,7 +21,7 @@
 # A- Move left
 # S- Move down (temporary)
 # D- Move right
-# Q- quit
+# Q- Quit
 # 
 # Link to video demonstration for final submission:
 # Not applicable
