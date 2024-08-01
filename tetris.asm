@@ -345,7 +345,7 @@ check_new_position:
 	jr $ra		#return
 	
 
-#NEW DRAW FUNCTION: This will draw the current shape regardless of type
+#Draws the current shape onto the board as a falling block
 draw_shape: 
 	li $t0 0
 	#load display
@@ -375,6 +375,7 @@ draw_shape:
 	j draw_loop_start
 	draw_loop_end: jr $ra		#return
 
+#Clears the current falling block
 clear_shape: 
 	la $s6 COLOR_DARK
 	lw $s6 0($s6)
