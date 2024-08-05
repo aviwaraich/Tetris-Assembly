@@ -48,6 +48,8 @@ current_y: .word 1  # Y position
 is_vertical: .word 1  # Orientation
 playing_field: .space 4096  # Playing field
 full_row_message: .asciiz "Row is Full\n"
+gravity_speed: .word 1000  # Initial gravity speed 
+ticks: .word 0  # ticks for gravity speed increase
 
 #I_SHAPE: .word -32, 0, 32, 64
 #O_SHAPE: .word 0, 1, 32, 33
@@ -144,11 +146,10 @@ game_loop:
 
 check_gravity:
     li $v0, 32
-    li $a0, 1000  # Sleep for (1 second)
+    lw $a0, gravity_speed
     syscall
     jal move_down_auto
     j game_loop
-
 
 #------------
 #--END MOVE--
@@ -245,14 +246,15 @@ clear_screen:
 #--GENERATE NEW BLOCK--
 #----------------------
 generate_new_block:
-	li $t0, 14  # Reset X position to center
-	sw $t0, current_x
-	li $t0, 1   # Reset Y position to top
-	sw $t0, current_y
-	li $t0, 1   # Reset rotation
-	sw $zero, rotation
-	jr $ra
-
+    li $t0, 14  # Reset X position to center
+    sw $t0, current_x
+    li $t0, 1   # Reset Y position to top
+    sw $t0, current_y
+    li $t0, 0   # Reset rotation
+    sw $t0, rotation
+    jal increase_speed 
+    jal draw_shape
+    j game_loop
 
 #--------------------
 #--COMPUTE POSITION--
@@ -430,10 +432,10 @@ clear_shape:
 block_landed:
     jal add_to_playing_field
     jal redraw_playing_field
-    jal generate_new_block
-    jal draw_shape
     jal check_full_rows
-    j game_loop
+    j generate_new_block
+    jal draw_shape
+    j game_loop  # Jump back to the game loop
 
 
 #---------------------
@@ -551,7 +553,7 @@ row_not_full:
     beqz $t1, end_check
     jal redraw_playing_field
 end_check:
-    j game_loop
+    j generate_new_block 
 
 remove_row:
     move $t6, $t0  # Current row to remove
@@ -587,7 +589,6 @@ quit:
 	syscall
 
 move_down_auto:
-    # Move tetromino down automatically
     jal clear_shape     
     li $a0, 0
     li $a1, 1
@@ -597,7 +598,32 @@ move_down_auto:
     lw $t0, current_y
     addi $t0, $t0, 1
     sw $t0, current_y
-    j end_move
+    jal draw_shape
+    j game_loop
     
-
+increase_speed:
+    lw $t0, ticks
+    addi $t0, $t0, 1
+    sw $t0, ticks
+    li $t1, 1  # Increase speed every 5 ticks [For Final, 1 for Test]
+    div $t0, $t1
+    mflo $t2
+    beqz $t2, end_increase_speed
+    lw $t3, gravity_speed
+    li $t4, 200  # Minimum speed (fastest)
+    ble $t3, $t4, end_increase_speed
+    addi $t3, $t3, -100  # Decrease delay by 100ms
+    sw $t3, gravity_speed
+    
+    # Print  del afte r
+    li $v0, 1
+    move $a0, $t3
+    syscall
+    
+    li $v0, 11
+    li $a0, 10
+    syscall
+    
+end_increase_speed:
+    jr $ra
 
