@@ -130,18 +130,24 @@ jal draw_shape  			# Draw initial shape
 #--GAME LOOP--
 #-------------
 game_loop:
-	li $t1, 0xffff0000
-	lw $t2, 0($t1)
-	beq $t2, $zero, game_loop  	# Check for key press
+    li $t1, 0xffff0000
+    lw $t2, 0($t1)
+    beq $t2, $zero, check_gravity  # If no key press, check gravity
+    
+    lw $t3, 4($t1)
+    beq $t3, 0x61, move_left    # 'a' key
+    beq $t3, 0x64, move_right   # 'd' key
+    beq $t3, 0x73, move_down    # 's' key
+    beq $t3, 0x77, rotate       # 'w' key
+    beq $t3, 0x71, quit         # 'q' key
+    j game_loop
 
-	lw $t3, 4($t1)
-	beq $t3, 0x61, move_left	# 'a' key
-	beq $t3, 0x64, move_right	# 'd' key
-	beq $t3, 0x73, move_down	# 's' key
-	beq $t3, 0x77, rotate		# 'w' key
-	beq $t3, 0x71, quit		# 'q' key
-	j game_loop
-
+check_gravity:
+    li $v0, 32
+    li $a0, 1000  # Sleep for (1 second)
+    syscall
+    jal move_down_auto
+    j game_loop
 
 
 #------------
@@ -422,12 +428,12 @@ clear_shape:
 #--Called when block lands on ground
 #----------------
 block_landed:
-	jal add_to_playing_field
-	jal redraw_playing_field
-	jal generate_new_block
-	jal draw_shape
-	jal check_full_rows
-	j game_loop
+    jal add_to_playing_field
+    jal redraw_playing_field
+    jal generate_new_block
+    jal draw_shape
+    jal check_full_rows
+    j game_loop
 
 
 #---------------------
@@ -579,3 +585,19 @@ clear_top_loop:
 quit: 
 	li $v0 10
 	syscall
+
+move_down_auto:
+    # Move tetromino down automatically
+    jal clear_shape     
+    li $a0, 0
+    li $a1, 1
+    li $a2, 0
+    jal check_new_position
+    beq $v0, $zero, block_landed
+    lw $t0, current_y
+    addi $t0, $t0, 1
+    sw $t0, current_y
+    j end_move
+    
+
+
