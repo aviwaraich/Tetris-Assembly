@@ -49,7 +49,7 @@ is_vertical: .word 1  # Orientation
 playing_field: .space 4096  # Playing field
 full_row_message: .asciiz "Row is Full\n"
 gravity_counter: .word 0
-gravity_threshold: .word 50  # initial fall speed
+gravity_threshold: .word 100  # initial fall speed (adjust as needed)
 rows_cleared: .word 0
 speed_increase_threshold: .word 10  # Increase speed every 10 rows
 
@@ -166,7 +166,7 @@ skip_gravity:
 
     # Sleep for a short time
     li $v0, 32
-    li $a0, 17  # Sleep for 4ms
+    li $a0, 4  # Sleep for 4ms (adjust if u want ngl)
     syscall
 
     j game_loop
@@ -229,9 +229,8 @@ move_down:
 	lw $t0, current_y
 	addi $t0, $t0, 1
 	sw $t0, current_y
-	jal draw_shape
 	#end move
-	j end_move
+	j end_move 
 
 rotate:  # Move tetromino left
 	#clear shape
@@ -450,13 +449,14 @@ clear_shape:
 #--BLOCK LANDED--
 #--Called when block lands on ground
 #----------------
+
 block_landed:
-    jal add_to_playing_field
-    jal check_full_rows
-    jal redraw_playing_field
-    jal generate_new_block
-    jal draw_shape
-    j game_loop
+	jal add_to_playing_field
+	jal redraw_playing_field
+	jal generate_new_block
+	jal draw_shape
+	jal check_full_rows
+	j game_loop
 
 
 #---------------------
@@ -545,25 +545,22 @@ redraw_playing_field:
 	redraw_loop_end:
 	jr $ra
 	
-#####################################################################
-
 check_full_rows:
-    li $t0, 30  # Start from the second to last row
-    li $t1, 0   # Counter for removed rows
+    li $t0, 30  # Start is the second to last row
+    li $t1, 0   # Counter telling the  removed rows
 check_line_loop:
     li $t2, 1
     li $t3, 30
-    li $t5, 1   # Assume row is full
+    li $t5, 1   # if row is full
 check_block_loop:
-    mul $t4, $t0, 32
-    add $t4, $t4, $t2
-    sll $t4, $t4, 2
-    lw $t6, playing_field($t4)
-    beqz $t6, row_not_full
-    addi $t2, $t2, 1
-    ble $t2, $t3, check_block_loop
-    # If we're here, the row is full
-    move $a0, $t0
+        mul $t4, $t0, 32
+        add $t4, $t4, $t2
+        sll $t4, $t4, 2
+        lw $t6, playing_field($t4)
+        beqz $t6, row_not_full
+        addi $t2, $t2, 1
+        ble $t2, $t3, check_block_loop
+    # If u here, the row is full
     jal remove_row
     addi $t1, $t1, 1
     j check_line_loop  # Check the same row again
@@ -571,11 +568,44 @@ row_not_full:
     addi $t0, $t0, -1
     bgez $t0, check_line_loop
     
-    # Update rows cleared and check for speed increase
-    lw $t0, rows_cleared
-    add $t0, $t0, $t1  # Add number of rows just cleared
-    sw $t0, rows_cleared
+    # redraw the field if removed 
+    beqz $t1, end_check
+    jal redraw_playing_field
+end_check:
+    j game_loop
 
+remove_row:
+    move $t6, $t0  # Current row to remove
+remove_loop:
+    beqz $t6, fill_top_row
+    li $t2, 1
+copy_row_loop:
+        mul $t4, $t6, 32
+        add $t4, $t4, $t2
+        sll $t4, $t4, 2
+        addi $t5, $t4, -128  #  block in the row above
+        lw $t7, playing_field($t5)
+        sw $t7, playing_field($t4)
+        addi $t2, $t2, 1
+        ble $t2, $t3, copy_row_loop
+    addi $t6, $t6, -1
+    j remove_loop
+
+fill_top_row:
+    li $t2, 1
+clear_top_loop:
+        mul $t4, $t6, 32
+        add $t4, $t4, $t2
+        sll $t4, $t4, 2
+        sw $zero, playing_field($t4)
+        addi $t2, $t2, 1
+        ble $t2, $t3, clear_top_loop
+    jr $ra
+
+#####################################################################
+
+check_speed_increase:
+    lw $t0, rows_cleared
     lw $t1, speed_increase_threshold
     div $t0, $t1
     mfhi $t2  # Remainder
@@ -583,42 +613,15 @@ row_not_full:
 
     # Increase speed
     lw $t0, gravity_threshold
-    mul $t0, $t0, 9
-    div $t0, $t0, 10  # Decrease threshold by 10%
+    mul $t0, $t0, 95
+    div $t0, $t0, 100  # Decrease threshold by 5%
     sw $t0, gravity_threshold
 
 speed_check_end:
     jr $ra
 
-remove_row:
-    move $t6, $a0  # Current row to remove
-remove_loop:
-    beqz $t6, fill_top_row
-    li $t2, 1
-copy_row_loop:
-    mul $t4, $t6, 32
-    add $t4, $t4, $t2
-    sll $t4, $t4, 2
-    addi $t5, $t4, -128  # Address of block in the row above
-    lw $t7, playing_field($t5)
-    sw $t7, playing_field($t4)
-    addi $t2, $t2, 1
-    ble $t2, $t3, copy_row_loop
-    addi $t6, $t6, -1
-    j remove_loop
-
-fill_top_row:
-    li $t2, 1
-clear_top_loop:
-    mul $t4, $zero, 32
-    add $t4, $t4, $t2
-    sll $t4, $t4, 2
-    sw $zero, playing_field($t4)
-    addi $t2, $t2, 1
-    ble $t2, $t3, clear_top_loop
-    jr $ra
-    
 #####################################################################
+
 quit: 
-	li $v0 10
-	syscall
+    li $v0 10
+    syscall
