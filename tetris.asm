@@ -1,38 +1,3 @@
-######################################################################
-# CSCB58 Summer 2024 Assembly Final Project - UTSC
-# Student1: Jack Liu (Jia Qing Liu), 1009937730, liuji563, jql.liu@mail.utoronto.ca
-# Student2: Aviraj Waraich, 1006152057, waraic11, a.waraich@mail.utoronto.ca
-#
-# Bitmap Display Configuration:
-# - Unit width in pixels: 8
-# - Unit height in pixels: 8
-# - Display width in pixels: 256
-# - Display height in pixels: 256
-# - Base Address for Display: 0x10008000 ($gp)
-#
-# Which milestones have been reached in this submission?
-# - Milestone 1, 2, 3
-#
-# Which approved features have been implemented?
-# None
-#
-# How to play:
-# W- Rotate
-# A- Move left
-# S- Move down (temporary)
-# D- Move right
-# Q- Quit
-# 
-# Link to video demonstration for final submission:
-# Not applicable
-#
-# Are you OK with us sharing the video with people outside course staff?
-# Yes
-#
-# Any additional information that the TA needs to know:
-#
-######################################################################
-
 
 .data
 ADDR_DSPL: .word 0x10008000  # Base address for display
@@ -50,6 +15,35 @@ playing_field: .space 4096  # Playing field
 full_row_message: .asciiz "Row is Full\n"
 gravity_speed: .word 1000  # Initial gravity speed 
 ticks: .word 0  # ticks for gravity speed increase
+music_pointer: .word 0
+music_counter: .word 0
+.data
+tetris_theme:
+    # Main melody
+    .word 76, 120, 71, 60, 72, 60, 74, 120, 72, 60, 71, 60  # E5 B4 C5 D5 C5 B4
+    .word 69, 120, 69, 60, 72, 60, 76, 120, 74, 60, 72, 60  # A4 A4 C5 E5 D5 C5
+    .word 71, 120, 71, 60, 72, 60, 74, 120, 76, 120         # B4 B4 C5 D5 E5
+    .word 72, 120, 69, 120, 69, 120                         # C5 A4 A4
+    .word 72, 360, 76, 120, 79, 120                         # C5 (long) E5 G5
+    .word 81, 240, 79, 60, 78, 60                           # A5 G5 F#5
+    .word 74, 60, 76, 60, 81, 120, 79, 60, 78, 60           # D5 E5 A5 G5 F#5
+    .word 74, 60, 76, 60, 79, 120, 76, 60, 74, 60           # D5 E5 G5 E5 D5
+    .word 72, 120, 74, 120, 76, 120                         # C5 D5 E5
+    .word 72, 120, 69, 120, 69, 120                         # C5 A4 A4
+
+    # Repeat main melody
+    .word 76, 120, 71, 60, 72, 60, 74, 120, 72, 60, 71, 60  # E5 B4 C5 D5 C5 B4
+    .word 69, 120, 69, 60, 72, 60, 76, 120, 74, 60, 72, 60  # A4 A4 C5 E5 D5 C5
+    .word 71, 120, 71, 60, 72, 60, 74, 120, 76, 120         # B4 B4 C5 D5 E5
+    .word 72, 120, 69, 120, 69, 120                         # C5 A4 A4
+    .word 72, 360, 76, 120, 79, 120                         # C5 (long) E5 G5
+    .word 81, 240, 79, 60, 78, 60                           # A5 G5 F#5
+    .word 74, 60, 76, 60, 81, 120, 79, 60, 78, 60           # D5 E5 A5 G5 F#5
+    .word 74, 60, 76, 60, 79, 120, 76, 60, 74, 60           # D5 E5 G5 E5 D5
+    .word 72, 120, 74, 120, 76, 120                         # C5 D5 E5
+    .word 72, 120, 69, 120, 69, 120                         # C5 A4 A4
+
+    .word -1, -1  # End marker
 
 #I_SHAPE: .word -32, 0, 32, 64
 #O_SHAPE: .word 0, 1, 32, 33
@@ -126,6 +120,11 @@ right_border:
 	j right_border
 right_done:				#Finished border
 
+# Initialize music pointer
+    la $t0, tetris_theme
+    sw $t0, music_pointer
+
+
 jal redraw_playing_field
 jal draw_shape  			# Draw initial shape
 #-------------
@@ -134,21 +133,29 @@ jal draw_shape  			# Draw initial shape
 game_loop:
     li $t1, 0xffff0000
     lw $t2, 0($t1)
-    beq $t2, $zero, check_gravity  # If no key press, check gravity
-    
+    beq $t2, $zero, no_key_press
+
     lw $t3, 4($t1)
     beq $t3, 0x61, move_left    # 'a' key
     beq $t3, 0x64, move_right   # 'd' key
     beq $t3, 0x73, move_down    # 's' key
     beq $t3, 0x77, rotate       # 'w' key
     beq $t3, 0x71, quit         # 'q' key
-    j game_loop
 
-check_gravity:
+no_key_press:
+    # Play music
+    jal play_next_note
+    
+    # Delay between notes (adjust as needed)
     li $v0, 32
+    li $a0, 100  # 100ms delay
+    syscall
+
+    # Check gravity
     lw $a0, gravity_speed
     syscall
     jal move_down_auto
+
     j game_loop
 
 #------------
@@ -524,7 +531,6 @@ redraw_playing_field:
 	redraw_loop_end:
 	jr $ra
 	
-#####################################################################
 
 check_full_rows:
     li $t0, 30  # Start is the second to last row
@@ -583,7 +589,6 @@ clear_top_loop:
         ble $t2, $t3, clear_top_loop
     jr $ra
     
-#####################################################################
 quit: 
 	li $v0 10
 	syscall
@@ -626,4 +631,80 @@ increase_speed:
     
 end_increase_speed:
     jr $ra
+    
+#####################################################################
 
+
+test_music:
+    lw $t0, music_pointer
+    lw $a0, 0($t0)  # Pitch
+    lw $a1, 4($t0)  # Duration
+    
+    # Check for end of song
+    li $t1, -1
+    beq $a0, $t1, reset_music
+    
+    # Flash a pixel instead of playing a sound
+    li $t1, 0x10008000  # Assume this is your display address
+    li $t2, 0x00FFFFFF  # White color
+    sw $t2, 0($t1)      # Draw white pixel
+    
+    # Delay for the duration of the note
+    li $v0, 32
+    move $a0, $a1
+    syscall
+    
+    # Clear the pixel
+    sw $zero, 0($t1)
+    
+    # Move to next note
+    addi $t0, $t0, 8
+    sw $t0, music_pointer
+    
+    j test_music
+
+    
+test_loop:
+    jal play_next_note
+    
+    # Delay between notes
+    li $v0, 32
+    li $a0, 200  # 200ms delay
+    syscall
+    
+    j test_loop
+
+play_next_note:
+    lw $t0, music_pointer
+    lw $a0, 0($t0)  # Pitch
+    lw $a1, 4($t0)  # Duration
+    
+    # Check for end of song
+    li $t1, -1
+    beq $a0, $t1, reset_music
+    
+    # Debug output
+    li $v0, 1
+    syscall
+    li $v0, 11
+    li $a0, 32  # space
+    syscall
+    
+    # Play the note
+    li $v0, 31
+    syscall
+    
+    # Move to next note
+    addi $t0, $t0, 8
+    sw $t0, music_pointer
+    
+    jr $ra
+    
+    jr $ra
+
+reset_music:
+    la $t0, tetris_theme
+    sw $t0, music_pointer
+    j test_music
+
+#####################################################################
