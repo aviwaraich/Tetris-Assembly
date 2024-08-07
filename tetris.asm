@@ -51,7 +51,11 @@ full_row_message: .asciiz "Row is Full\n"
 gravity_counter: .word 0
 gravity_threshold: .word 100  # initial fall speed (adjust as needed)
 rows_cleared: .word 0
-speed_increase_threshold: .word 10  # Increase speed every 10 rows
+speed_increase_threshold: .word 1  # Increase speed every 10 rows [Make 10 for final]
+speed_increase_msg: .asciiz "Speed increased! "
+current_threshold_msg: .asciiz "Current gravity threshold: "
+newline: .asciiz "\n"
+rows_cleared_msg: .asciiz "Total rows cleared: "
 
 #I_SHAPE: .word -32, 0, 32, 64
 #O_SHAPE: .word 0, 1, 32, 33
@@ -450,12 +454,30 @@ clear_shape:
 #--Called when block lands on ground
 #----------------
 
+
 block_landed:
 	jal add_to_playing_field
 	jal redraw_playing_field
 	jal generate_new_block
 	jal draw_shape
 	jal check_full_rows
+	
+	# Print rows cleared message
+	li $v0, 4
+	la $a0, rows_cleared_msg
+	syscall
+	
+	# Print number of rows cleared
+	li $v0, 1
+	lw $a0, rows_cleared
+	syscall
+	
+	# Print newline
+	li $v0, 4
+	la $a0, newline
+	syscall
+	
+	jal check_speed_increase 
 	j game_loop
 
 
@@ -561,6 +583,12 @@ check_block_loop:
         addi $t2, $t2, 1
         ble $t2, $t3, check_block_loop
     # If u here, the row is full
+    
+    # Increment rows_cleared counter
+    lw $t8, rows_cleared
+    addi $t8, $t8, 1
+    sw $t8, rows_cleared
+    
     jal remove_row
     addi $t1, $t1, 1
     j check_line_loop  # Check the same row again
@@ -572,10 +600,11 @@ row_not_full:
     beqz $t1, end_check
     jal redraw_playing_field
 end_check:
-    j game_loop
+    j check_speed_increase
 
 remove_row:
     move $t6, $t0  # Current row to remove
+    
 remove_loop:
     beqz $t6, fill_top_row
     li $t2, 1
@@ -599,7 +628,7 @@ clear_top_loop:
         sll $t4, $t4, 2
         sw $zero, playing_field($t4)
         addi $t2, $t2, 1
-        ble $t2, $t3, clear_top_loop
+        ble $t2, $t3, clear_top_loop    
     jr $ra
 
 #####################################################################
@@ -607,18 +636,50 @@ clear_top_loop:
 check_speed_increase:
     lw $t0, rows_cleared
     lw $t1, speed_increase_threshold
-    div $t0, $t1
-    mfhi $t2  # Remainder
-    bnez $t2, speed_check_end
+    blt $t0, $t1, speed_check_end  # If rows cleared < threshold, don't change speed
 
     # Increase speed
     lw $t0, gravity_threshold
-    mul $t0, $t0, 95
-    div $t0, $t0, 100  # Decrease threshold by 5%
+    mul $t0, $t0, 90   # Decrease threshold by 10%
+    div $t0, $t0, 100
+
+    # Ensure we don't go below the minimum threshold
+    li $t3, 10  # Minimum threshold
+    blt $t0, $t3, set_min_threshold
+    j store_threshold
+
+set_min_threshold:
+    li $t0, 10
+
+store_threshold:
     sw $t0, gravity_threshold
 
+    # Reset rows_cleared by subtracting the threshold
+    lw $t2, rows_cleared
+    sub $t2, $t2, $t1
+    sw $t2, rows_cleared
+
+    # Print speed increase message
+    li $v0, 4
+    la $a0, speed_increase_msg
+    syscall
+
+    # Print current gravity threshold
+    li $v0, 4
+    la $a0, current_threshold_msg
+    syscall
+
+    li $v0, 1
+    move $a0, $t0
+    syscall
+
+    # Print newline
+    li $v0, 4
+    la $a0, newline
+    syscall
+
 speed_check_end:
-    jr $ra
+    j game_loop
 
 #####################################################################
 
