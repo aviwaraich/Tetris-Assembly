@@ -60,6 +60,10 @@ music_playing: .word 1
 music_threshold: .word 100  #fOR TESTING (higher = slower)
 music_counter: .word 0
 current_note_index: .word 0
+debug_msg: .asciiz "Playing note index: "
+debug_pitch: .asciiz ", Pitch: "
+debug_duration: .asciiz ", Duration: "
+reset_msg: .asciiz "Resetting music to beginning\n"
 
 # Music data
 notes:
@@ -82,7 +86,7 @@ durations:
     .byte 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16
     .byte 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16
     .byte 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16
-    .byte 0   # End markermarker
+    .byte 0   # End marker
 
 #I_SHAPE: .word -32, 0, 32, 64
 #O_SHAPE: .word 0, 1, 32, 33
@@ -722,7 +726,7 @@ play_music:
     lw $t9, music_playing
     beqz $t9, music_done  # If music_playing is 0, skip playing music
 
-    # Increment music counter
+    # add music counter
     lw $t9, music_counter
     addi $t9, $t9, 1
     sw $t9, music_counter
@@ -736,17 +740,46 @@ play_music:
 
     lw $t0, current_note_index
 
-    # Load note and duration
+    # Check if we've reached the end of the song
+    li $t4, 128  # Total number of notes
+    bge $t0, $t4, reset_music
+
+    # Load note
     la $t1, notes
     add $t1, $t1, $t0
     lb $t2, ($t1)  # Load note
+
+    # Check for end marker
+    li $t4, 255
+    beq $t2, $t4, reset_music
+
+    # Load duration
     la $t1, durations
     add $t1, $t1, $t0
     lb $t3, ($t1)  # Load duration
 
-    # Check if we've reached the end of the song
-    li $t4, 255
-    beq $t2, $t4, reset_music
+    # debug
+    li $v0, 4
+    la $a0, debug_msg
+    syscall
+    li $v0, 1
+    move $a0, $t0
+    syscall
+    li $v0, 4
+    la $a0, debug_pitch
+    syscall
+    li $v0, 1
+    move $a0, $t2
+    syscall
+    li $v0, 4
+    la $a0, debug_duration
+    syscall
+    li $v0, 1
+    move $a0, $t3
+    syscall
+    li $v0, 4
+    la $a0, newline
+    syscall
 
     # Play the note
     li $v0, 31
@@ -754,7 +787,7 @@ play_music:
     li $t5, 20
     mul $a1, $t3, $t5  # duration (20 ms per duration unit)
     li $a2, 0  # instrument (piano)
-    li $a3, 64  # volume (reduced from 127 to 64)
+    li $a3, 64  # volume 
     syscall
 
     # Move to next note
@@ -765,6 +798,10 @@ play_music:
 
 reset_music:
     sw $zero, current_note_index
+    # Print reset message
+    li $v0, 4
+    la $a0, reset_msg
+    syscall
 
 music_done:
     jr $ra
