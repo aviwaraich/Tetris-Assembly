@@ -56,6 +56,33 @@ speed_increase_msg: .asciiz "Speed increased! "
 current_threshold_msg: .asciiz "Current gravity threshold: "
 newline: .asciiz "\n"
 rows_cleared_msg: .asciiz "Total rows cleared: "
+music_playing: .word 1
+music_threshold: .word 100  #fOR TESTING (higher = slower)
+music_counter: .word 0
+current_note_index: .word 0
+
+# Music data
+notes:
+    .byte 64, 64, 64, 64, 59, 59, 60, 60, 62, 62, 64, 62, 60, 60, 59, 59
+    .byte 57, 57, 57, 57, 57, 57, 60, 60, 64, 64, 64, 64, 62, 62, 60, 60
+    .byte 59, 59, 52, 52, 59, 59, 60, 60, 62, 62, 62, 62, 64, 64, 64, 64
+    .byte 60, 60, 60, 60, 57, 57, 57, 57, 57, 57, 59, 59, 59, 59, 60, 60
+    .byte 60, 62, 62, 62, 62, 62, 65, 65, 69, 69, 69, 69, 67, 67, 65, 65
+    .byte 64, 64, 64, 64, 64, 64, 60, 60, 64, 64, 64, 64, 62, 62, 60, 60
+    .byte 59, 59, 59, 59, 59, 59, 60, 60, 62, 62, 62, 62, 64, 64, 64, 64
+    .byte 60, 60, 60, 60, 57, 57, 57, 57, 57, 57, 57, 57, 57, 57, 57, 57
+    .byte 255  # End marker
+
+durations:
+    .byte 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16
+    .byte 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16
+    .byte 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16
+    .byte 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16
+    .byte 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16
+    .byte 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16
+    .byte 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16
+    .byte 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16
+    .byte 0   # End markermarker
 
 #I_SHAPE: .word -32, 0, 32, 64
 #O_SHAPE: .word 0, 1, 32, 33
@@ -132,6 +159,8 @@ right_border:
 	j right_border
 right_done:				#Finished border
 
+jal init_music
+
 jal redraw_playing_field
 jal draw_shape  			# Draw initial shape
 #-------------
@@ -167,6 +196,8 @@ key_pressed:
 skip_key_handling:
 skip_gravity:
     jal draw_shape
+
+    jal play_music
 
     # Sleep for a short time
     li $v0, 32
@@ -631,8 +662,6 @@ clear_top_loop:
         ble $t2, $t3, clear_top_loop    
     jr $ra
 
-#####################################################################
-
 check_speed_increase:
     lw $t0, rows_cleared
     lw $t1, speed_increase_threshold
@@ -683,6 +712,77 @@ speed_check_end:
 
 #####################################################################
 
+# Add these new functions
+init_music:
+    sw $zero, current_note_index  # Start from the first note
+    sw $zero, music_counter  # Initialize music counter
+    jr $ra
+    
+play_music:
+    lw $t9, music_playing
+    beqz $t9, music_done  # If music_playing is 0, skip playing music
+
+    # Increment music counter
+    lw $t9, music_counter
+    addi $t9, $t9, 1
+    sw $t9, music_counter
+
+    # Check if we should play a note
+    lw $t8, music_threshold
+    blt $t9, $t8, music_done
+
+    # Reset music counter
+    sw $zero, music_counter
+
+    lw $t0, current_note_index
+
+    # Load note and duration
+    la $t1, notes
+    add $t1, $t1, $t0
+    lb $t2, ($t1)  # Load note
+    la $t1, durations
+    add $t1, $t1, $t0
+    lb $t3, ($t1)  # Load duration
+
+    # Check if we've reached the end of the song
+    li $t4, 255
+    beq $t2, $t4, reset_music
+
+    # Play the note
+    li $v0, 31
+    move $a0, $t2  # pitch
+    li $t5, 20
+    mul $a1, $t3, $t5  # duration (20 ms per duration unit)
+    li $a2, 0  # instrument (piano)
+    li $a3, 64  # volume (reduced from 127 to 64)
+    syscall
+
+    # Move to next note
+    addi $t0, $t0, 1
+    sw $t0, current_note_index
+
+    j music_done
+
+reset_music:
+    sw $zero, current_note_index
+
+music_done:
+    jr $ra
+
+#####################################################################
+
 quit: 
-    li $v0 10
+    # Stop the music
+    sw $zero, music_playing
+
+    # Stop all sound
+    li $v0, 31
+    li $a0, 0   # pitch (0 to stop all sound)
+    li $a1, 0   # duration
+    li $a2, 0   # instrument
+    li $a3, 0   # volume
+    syscall
+
+    # Exit the program
+    li $v0, 10
     syscall
