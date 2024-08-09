@@ -17,10 +17,10 @@
 # (E1) Gravity
 # (E2) Speed of gravity
 # (E4) Sounds for movement, rotation, dropped, and line
-#
-#
-#
-#
+# (E11) Pieces have different colour
+# (H2) Full set of blocks
+# (H4) Line completion animations
+# (H5) Tetris music
 #
 # How to play:
 # W- Rotate
