@@ -36,7 +36,7 @@
 # Yes
 #
 # Any additional information that the TA needs to know:
-# 
+# Not applicable
 ######################################################################
 
 
@@ -818,16 +818,6 @@ store_threshold:
     sub $t2, $t2, $t1
     sw $t2, rows_cleared
 
-    # Print speed increase message
-    li $v0, 4
-    la $a0, speed_increase_msg
-    syscall
-
-    # Print current gravity threshold
-    li $v0, 4
-    la $a0, current_threshold_msg
-    syscall
-
     li $v0, 1
     move $a0, $t0
     syscall
@@ -883,29 +873,6 @@ play_music:
     la $t1, durations
     add $t1, $t1, $t0
     lb $t3, ($t1)  # Load duration
-
-    # debug
-    li $v0, 4
-    la $a0, debug_msg
-    syscall
-    li $v0, 1
-    move $a0, $t0
-    syscall
-    li $v0, 4
-    la $a0, debug_pitch
-    syscall
-    li $v0, 1
-    move $a0, $t2
-    syscall
-    li $v0, 4
-    la $a0, debug_duration
-    syscall
-    li $v0, 1
-    move $a0, $t3
-    syscall
-    li $v0, 4
-    la $a0, newline
-    syscall
 
     # Play the note
     li $v0, 31
