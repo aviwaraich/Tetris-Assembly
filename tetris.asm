@@ -30,7 +30,7 @@
 # Q- Quit
 # 
 # Link to video demonstration for final submission:
-# 
+# https://drive.google.com/file/d/1KLz47e2hMeOKPPOOLY3Ld0W40azwyI6J/view?usp=sharing
 #
 # Are you OK with us sharing the video with people outside course staff?
 # Yes
