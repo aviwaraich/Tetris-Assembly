@@ -11,10 +11,16 @@
 # - Base Address for Display: 0x10008000 ($gp)
 #
 # Which milestones have been reached in this submission?
-# - Milestone 1, 2, 3
+# - Milestone 1, 2, 3, 4, 5
 #
 # Which approved features have been implemented?
-# None
+# (E1) Gravity
+# (E2) Speed of gravity
+# (E4) Sounds for movement, rotation, dropped, and line
+#
+#
+#
+#
 #
 # How to play:
 # W- Rotate
@@ -107,7 +113,7 @@ J_SHAPE: .word 0 , -1,		0 , 0,		-1, 1,		0 , 1
 
 T_SHAPE: .word 0 , -1, 		-1, 0,		0 , 0,		0 , 1
 Z_SHAPE: .word -1, -1, 		0 ,-1,		0 , 0,		1 , 0
-S_SHAPE: .word -1, -1,		0 ,-1,		0 , 0,		1 , 0
+S_SHAPE: .word 1, -1,		0 ,-1,		0 , 0,		-1 , 0
 
 current_shape: .word 0 , -1,		0 , 0,		0 , 1,		0 , 2
 rotation: .word 0
@@ -491,6 +497,21 @@ draw_shape:
 #Clear screen when game over
 game_over:
 	jal clear_screen
+	li $v0, 31
+    	li $a0 50 # pitch
+  	li $a1 500 # duration (20 ms per duration unit)
+  	li $a2, 80  # instrument
+  	li $a3, 60  # volume
+    	syscall 
+    	li $v0, 32
+    	li $a0, 450  # Sleep for 4ms (adjust if u want ngl)
+   	syscall
+   	li $v0, 31
+    	li $a0 40 # pitch
+  	li $a1 500 # duration (20 ms per duration unit)
+  	li $a2, 80  # instrument
+  	li $a3, 60  # volume
+    	syscall 
 	game_over_loop:
 	j game_over_loop
 
