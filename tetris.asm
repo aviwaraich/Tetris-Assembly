@@ -95,6 +95,7 @@ I_SHAPE: .word 0 , -1,		0 , 0,		0 , 1,		0 , 2
 O_SHAPE: .word 0 , 0 ,		0 , 1,		1 , 0,		1 , 1
 L_SHAPE: .word 0 , -1,		0 , 0,		0 , 1,		1 , 1
 J_SHAPE: .word 0 , -1,		0 , 0,		-1, 1,		0 , 1
+
 T_SHAPE: .word 0 , -1, 		-1, 0,		0 , 0,		0 , 1
 Z_SHAPE: .word -1, -1, 		0 ,-1,		0 , 0,		1 , 0
 S_SHAPE: .word -1, -1,		0 ,-1,		0 , 0,		1 , 0
@@ -159,6 +160,7 @@ right_done:				#Finished border
 
 jal init_music
 
+jal switch_shape
 jal redraw_playing_field
 jal draw_shape  			# Draw initial shape
 #-------------
@@ -406,7 +408,7 @@ check_new_position:
 	jr $ra		#return
 	
 
-#NEW DRAW FUNCTION: This will draw the current shape regardless of type
+#Draws the current shape onto the board as a falling block
 draw_shape: 
 	li $t0 0
 	#load display
@@ -417,6 +419,7 @@ draw_shape:
 	draw_loop: 
 		#load x and y values into arguments
 		lw $a0 current_shape($t0)
+		
 		addi $t5 $t0 4
 		lw $a1 current_shape($t5)
 		lw $a2 rotation($zero)
@@ -436,6 +439,7 @@ draw_shape:
 	j draw_loop_start
 	draw_loop_end: jr $ra		#return
 
+#Clears the current falling block
 clear_shape: 
 	la $s6 COLOR_DARK
 	lw $s6 0($s6)
@@ -488,6 +492,7 @@ block_landed:
 	jal add_to_playing_field
 	jal redraw_playing_field
 	jal generate_new_block
+	jal switch_shape
 	jal draw_shape
 	jal check_full_rows
 	
@@ -801,6 +806,77 @@ music_done:
     jr $ra
 
 #####################################################################
+
+#-----------------------
+#--Switch shape--
+#-Switch shape to a new shape
+switch_shape:
+	
+	
+	#li $v0 40
+	#li $a0 50
+	#li $a1 15
+	#syscall
+	
+	li $v0 42
+	li $a1 7
+	syscall
+	move $t1 $a0
+	
+	
+	li $t0 0
+	li $t2 32
+	switch_loop:
+	bge $t0 $t2 switch_loop_end
+	#Jump to correct number
+	li $t3 0
+	beq $t3 $t1 switch_I
+	li $t3 1
+	beq $t3 $t1 switch_O
+	li $t3 2
+	beq $t3 $t1 switch_J
+	li $t3 3
+	beq $t3 $t1 switch_L
+	li $t3 4
+	beq $t3 $t1 switch_Z
+	li $t3 5
+	beq $t3 $t1 switch_S
+	li $t3 6
+	beq $t3 $t1 switch_T
+	#Switch jump
+	switch_I: 
+		lw $t4 I_SHAPE($t0)
+		sw $t4 current_shape($t0)
+		j switch_loop_continue
+	switch_O:
+		lw $t4 O_SHAPE($t0)
+		sw $t4 current_shape($t0)
+		j switch_loop_continue
+	switch_J:
+		lw $t4 J_SHAPE($t0)
+		sw $t4 current_shape($t0)
+		j switch_loop_continue
+	switch_L:
+		lw $t4 L_SHAPE($t0)
+		sw $t4 current_shape($t0)
+		j switch_loop_continue
+	switch_Z:
+		lw $t4 Z_SHAPE($t0)
+		sw $t4 current_shape($t0)
+		j switch_loop_continue
+	switch_S:
+		lw $t4 S_SHAPE($t0)
+		sw $t4 current_shape($t0)
+		j switch_loop_continue
+	switch_T:
+		lw $t4 T_SHAPE($t0)
+		sw $t4 current_shape($t0)
+		j switch_loop_continue
+	switch_loop_continue:
+	addi $t0 $t0 4
+	j switch_loop
+	switch_loop_end:
+	jr $ra
 
 quit: 
     # Stop the music
