@@ -80,7 +80,7 @@ durations:
 	.byte 48, 16, 16, 16, 48, 16, 16, 16, 48, 16, 16, 16, 48, 16, 16, 16, 48, 16, 16, 16, 48, 16, 48, 16, 48, 16, 48, 16, 48, 16, 16, 
 	.byte 48, 0, 16, 48, 0, 16, 16, 48, 0, 0, 16, 48, 0, 16, 16, 48, 0, 16, 16, 48, 0, 48, 0, 48, 0, 48, 0, 48, 0, 0
 	.byte 48, 0, 0, 48, 0, 0, 48, 0, 0, 48, 0, 0, 48, 0, 0, 48, 0, 0, 48, 0, 0, 48, 0, 0, 48, 0, 0, 48, 0, 0, 48, 0, 0, 48, 0, 0, 32, 0, 32, 0, 48, 0, 0, 48, 0, 0
-	.byte 255   # End marker
+ # End marker
 
 #I_SHAPE: .word -32, 0, 32, 64
 #O_SHAPE: .word 0, 1, 32, 33
@@ -735,7 +735,7 @@ play_music:
     lw $t0, current_note_index
 
     # Check if we've reached the end of the song
-    li $t4, 255   # Total number of notes
+    li $t4, 168   # Total number of notes
     bge $t0, $t4, reset_music
 
     # Load note
