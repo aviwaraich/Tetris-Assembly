@@ -25,18 +25,18 @@
 # How to play:
 # W- Rotate
 # A- Move left
-# S- Move down (temporary)
+# S- Drop piece
 # D- Move right
 # Q- Quit
 # 
 # Link to video demonstration for final submission:
-# Not applicable
+# 
 #
 # Are you OK with us sharing the video with people outside course staff?
 # Yes
 #
 # Any additional information that the TA needs to know:
-#
+# 
 ######################################################################
 
 
