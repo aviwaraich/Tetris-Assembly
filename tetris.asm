@@ -40,10 +40,8 @@ ADDR_KBRD: .word 0xffff0000  # Base address for keyboard
 COLOR_GRAY: .word 0x00808080  # Wall color
 COLOR_TETROMINO: .word 0x00FF00FF  # Tetromino color
 COLOR_BLACK: .word 0x00000000  # Black color for clearing
-COLOR_DARK: .word 0x00101010  # Dark grey for checkerboard
-I_TETROMINO: .word 0x0000000F, 0x00000000, 0x00000000, 0x00000000  # Tetromino shape
-current_tetromino: .word 0x0000000F, 0x00000000, 0x00000000, 0x00000000  # Current tetromino
-current_x: .word 14  # Centered X position (32/2 - 2) = 14 
+COLOR_DARK: .word 0x00202020  # Dark grey for checkerboard
+current_x: .word 8  # Centered X position (32/2 - 2) = 14 
 current_y: .word 1  # Y position
 is_vertical: .word 1  # Orientation
 playing_field: .space 4096  # Playing field
@@ -64,6 +62,17 @@ debug_msg: .asciiz "Playing note index: "
 debug_pitch: .asciiz ", Pitch: "
 debug_duration: .asciiz ", Duration: "
 reset_msg: .asciiz "Resetting music to beginning\n"
+
+COLOR_I: .word 0x00000FF  
+COLOR_O: .word 0x000FF00 
+COLOR_L: .word 0x000FFFF  
+COLOR_J: .word 0x0FFFF00 
+COLOR_S: .word 0x0FF00FF  
+COLOR_Z: .word 0x0FF0000 
+COLOR_T: .word 0x0CC00FF 
+
+next_numbers: .word 1 1 1 1
+
 
 # Music data
 notes:
@@ -131,7 +140,7 @@ top_done:
 	li $t2, 0
 	li $t0, 0x10008F80  # Start address at last row (bottom border) [Base address + (31 rows * 32 units per row * 4 bytes per unit)]
 bottom_border:
-	beq $t2, 32, bottom_done 
+	beq $t2, 16, bottom_done 
 	sw $t3, 0($t0)
 	addi $t0, $t0, 4  # Move to the next unit in the row
 	addi $t2, $t2, 1
@@ -149,7 +158,7 @@ left_border:
 left_done:
 	# Draw the right border
 	li $t2, 0
-	li $t0, 0x1000807C  		# Start at last column (right border) [Base address + (31 * 4 bytes)]
+	li $t0, 0x10008040  		# Start at last column (right border) [Base address + (31 * 4 bytes)]
 right_border:
 	beq $t2, 32, right_done 
 	sw $t3, 0($t0)
@@ -159,6 +168,17 @@ right_border:
 right_done:				#Finished border
 
 jal init_music
+li $t0 0
+li $t1 12
+load_loop:
+	bgt $t0 $t1 load_loop_end
+	li $v0 42
+	li $a1 7
+	syscall
+	sw $a0 next_numbers($t0)
+	addi $t0 $t0 4
+	j load_loop
+load_loop_end:
 
 jal switch_shape
 jal redraw_playing_field
@@ -230,6 +250,12 @@ move_left:  # Move tetromino left
 	addi $t0, $t0, -1
 	sw $t0, current_x
 	#end move
+	li $v0, 31
+    	li $a0 40 # pitch
+  	li $a1 80 # duration (20 ms per duration unit)
+  	li $a2, 80  # instrument
+  	li $a3, 60  # volume
+    	syscall 
 	j end_move
 
 move_right: # Move tetromino left
@@ -247,6 +273,12 @@ move_right: # Move tetromino left
 	addi $t0, $t0, 1
 	sw $t0, current_x
 	#end move
+	li $v0, 31
+    	li $a0 30  # pitch
+  	li $a1 120 # duration (20 ms per duration unit)
+  	li $a2, 80  # instrument
+  	li $a3, 80  # volume
+  	syscall 
 	j end_move
 
 move_down:
@@ -265,6 +297,12 @@ move_down:
 	addi $t0, $t0, 1
 	sw $t0, current_y
 	#end move
+	li $v0, 31
+    	li $a0 30 # pitch
+  	li $a1 60 # duration (20 ms per duration unit)
+  	li $a2, 100  # instrument
+  	li $a3, 80  # volume
+  	syscall
 	j end_move 
 
 rotate:  # Move tetromino left
@@ -282,6 +320,12 @@ rotate:  # Move tetromino left
 	addi $t0, $t0, 1
 	sw $t0, rotation
 	#end move
+	li $v0, 31
+    	li $a0 70 # pitch
+  	li $a1 100 # duration (20 ms per duration unit)
+  	li $a2, 40  # instrument
+  	li $a3, 60  # volume
+    	syscall 
 	j end_move
 
 #----------------
@@ -302,7 +346,7 @@ clear_screen:
 #--GENERATE NEW BLOCK--
 #----------------------
 generate_new_block:
-	li $t0, 14  # Reset X position to center
+	li $t0, 8  # Reset X position to center
 	sw $t0, current_x
 	li $t0, 1   # Reset Y position to top
 	sw $t0, current_y
@@ -387,7 +431,7 @@ check_new_position:
 		add $t3 $t3 $s1
 		div $t3 $t8 #divide by 128. y stored in lo (result), x stored in hi (remainder)
 		
-		li $t8 120
+		li $t8 60
 		
 		mflo $t2  #y
 		mfhi $t1  #x
@@ -407,14 +451,16 @@ check_new_position:
 	li $v0 1 #1 = no collide
 	jr $ra		#return
 	
-
 #Draws the current shape onto the board as a falling block
+#Also draw an outline
 draw_shape: 
-	li $t0 0
 	#load display
 	la $t8 COLOR_TETROMINO
 	lw $t8 0($t8)
 	li $t6 32
+	
+	li $t0 0
+	
 	draw_loop_start: bge $t0 $t6 draw_loop_end
 	draw_loop: 
 		#load x and y values into arguments
@@ -430,6 +476,9 @@ draw_shape:
 		move $ra $s0
 		#obtain result
 		move $t1 $v0
+		#check game over
+		lw $t9 playing_field($t1)
+		bgtz $t9 game_over
 		#display pixel
 		la $t9 ADDR_DSPL
 		lw $t9 0($t9)
@@ -438,6 +487,12 @@ draw_shape:
 		addi $t0 $t0 8			#i ++
 	j draw_loop_start
 	draw_loop_end: jr $ra		#return
+
+#Clear screen when game over
+game_over:
+	jal clear_screen
+	game_over_loop:
+	j game_over_loop
 
 #Clears the current falling block
 clear_shape: 
@@ -489,6 +544,7 @@ clear_shape:
 
 
 block_landed:
+
 	jal add_to_playing_field
 	jal redraw_playing_field
 	jal generate_new_block
@@ -511,6 +567,12 @@ block_landed:
 	la $a0, newline
 	syscall
 	
+	li $v0, 31
+    	li $a0 60 # pitch
+  	li $a1 60 # duration (20 ms per duration unit)
+  	li $a2, 200  # instrument
+  	li $a3, 106  # volume
+  	syscall
 	jal check_speed_increase 
 	j game_loop
 
@@ -558,11 +620,8 @@ redraw_playing_field:
 	li $t9  4096
 	li $t8 128
 	
-	la $s7 COLOR_TETROMINO
-	lw $s7 0($s7)
 	la $s6 COLOR_DARK
 	lw $s6 0($s6)
-	
 	redraw_loop:
 	
 		
@@ -572,7 +631,7 @@ redraw_playing_field:
 		mfhi $t3 #x
 		
 		beqz $t3 redraw_loop_continue
-		li $t7 124
+		li $t7 64
 		beq $t3 $t7 redraw_loop_continue
 		li $t7 31
 		beq $t4 $t7 redraw_loop_continue
@@ -580,7 +639,7 @@ redraw_playing_field:
 		lw $t7 playing_field($t2)
 		add $t6 $t2 $t1
 		beqz $t7 redraw_background
-		sw $s7 0($t6)
+		sw $t7 0($t6)
 		j redraw_loop_continue
 		redraw_background:	
 		
@@ -602,11 +661,12 @@ redraw_playing_field:
 	jr $ra
 	
 check_full_rows:
+li $s7 0#rows cleared so far
     li $t0, 30  # Start is the second to last row
     li $t1, 0   # Counter telling the  removed rows
 check_line_loop:
     li $t2, 1
-    li $t3, 30
+    li $t3, 15
     li $t5, 1   # if row is full
 check_block_loop:
         mul $t4, $t0, 32
@@ -624,6 +684,9 @@ check_block_loop:
     sw $t8, rows_cleared
     
     jal remove_row
+    addi $s7 $s7 -1
+    #jal redraw_playing_field
+    
     addi $t1, $t1, 1
     j check_line_loop  # Check the same row again
 row_not_full:
@@ -638,7 +701,50 @@ end_check:
 
 remove_row:
     move $t6, $t0  # Current row to remove
-    
+    add $s2 $t6 $s7
+    li $t2 1
+	la $t9, ADDR_DSPL
+	lw $t9, 0($t9)
+	
+    li $v0, 31
+    li $a0 64  # pitch
+    li $a1 300 # duration (20 ms per duration unit)
+    li $a2, 80  # instrument
+    li $a3, 80  # volume 
+    syscall
+    remove_animation_loop:
+	
+        mul $t4, $s2, 32
+        add $t4, $t4, $t2
+        sll $t4, $t4, 2
+        lw $t7, COLOR_GRAY($zero)
+        add $t4 $t4 $t9
+        sw $t7, 0($t4)
+        
+	addi $t2 $t2 1
+ 	   # Sleep for a short time
+ 	li $v0, 32
+    	li $a0, 6  # Sleep for 4ms (adjust if u want ngl)
+   	syscall
+	ble $t2 $t3 remove_animation_loop
+
+    li $t2 1
+    remove_animation_loop2:
+	
+        mul $t4, $s2, 32
+        add $t4, $t4, $t2
+        sll $t4, $t4, 2
+        add $t4 $t4 $t9
+        sw $zero, 0($t4)
+        
+	addi $t2 $t2 1
+	
+	
+ 	   # Sleep for a short time
+ 	li $v0, 32
+    	li $a0, 6  # Sleep for 4ms (adjust if u want ngl)
+   	syscall
+	ble $t2 $t3 remove_animation_loop2
 remove_loop:
     beqz $t6, fill_top_row
     li $t2, 1
@@ -785,7 +891,7 @@ play_music:
     move $a0, $t2  # pitch
     li $t5, 20
     mul $a1, $t3, $t5  # duration (20 ms per duration unit)
-    li $a2, 0  # instrument (piano)
+    li $a2, 96  # instrument (piano)
     li $a3, 64  # volume 
     syscall
 
@@ -821,8 +927,18 @@ switch_shape:
 	li $v0 42
 	li $a1 7
 	syscall
-	move $t1 $a0
-	
+	li $t0 0
+	li $t5 8
+	lw $t1 next_numbers($zero)
+	move_front_loop:
+		bgt $t0 $t5 move_front_loop_end
+		addi $t2 $t0 4
+		lw $t3 next_numbers($t2)
+		sw $t3 next_numbers($t0)
+		addi $t0 $t0 4
+		j move_front_loop
+	move_front_loop_end:
+	sw $a0 next_numbers($t0)
 	
 	li $t0 0
 	li $t2 32
@@ -847,30 +963,45 @@ switch_shape:
 	switch_I: 
 		lw $t4 I_SHAPE($t0)
 		sw $t4 current_shape($t0)
+		lw $t4 COLOR_I($zero)
+		sw $t4 COLOR_TETROMINO($zero)
 		j switch_loop_continue
 	switch_O:
 		lw $t4 O_SHAPE($t0)
 		sw $t4 current_shape($t0)
+		lw $t4 COLOR_O($zero)
+		sw $t4 COLOR_TETROMINO($zero)
 		j switch_loop_continue
 	switch_J:
 		lw $t4 J_SHAPE($t0)
 		sw $t4 current_shape($t0)
+		lw $t4 COLOR_J($zero)
+		sw $t4 COLOR_TETROMINO($zero)
 		j switch_loop_continue
 	switch_L:
 		lw $t4 L_SHAPE($t0)
 		sw $t4 current_shape($t0)
+		
+		lw $t4 COLOR_L($zero)
+		sw $t4 COLOR_TETROMINO($zero)
 		j switch_loop_continue
 	switch_Z:
 		lw $t4 Z_SHAPE($t0)
 		sw $t4 current_shape($t0)
+		lw $t4 COLOR_Z($zero)
+		sw $t4 COLOR_TETROMINO($zero)
 		j switch_loop_continue
 	switch_S:
 		lw $t4 S_SHAPE($t0)
 		sw $t4 current_shape($t0)
+		lw $t4 COLOR_S($zero)
+		sw $t4 COLOR_TETROMINO($zero)
 		j switch_loop_continue
 	switch_T:
 		lw $t4 T_SHAPE($t0)
 		sw $t4 current_shape($t0)
+		lw $t4 COLOR_T($zero)
+		sw $t4 COLOR_TETROMINO($zero)
 		j switch_loop_continue
 	switch_loop_continue:
 	addi $t0 $t0 4
